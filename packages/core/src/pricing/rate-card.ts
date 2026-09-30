@@ -112,8 +112,10 @@ export const RATE_CARD: RateCardEntry[] = [
         sourceUrl: "https://kie.ai/pricing",
         sourceFingerprint: `kie-pricing-2026-09-30:veo-3-1-${label.toLowerCase()}-${routeMode}-720p:${credits}-per-video`,
         verifiedAt: "2026-09-30",
-        matches: (_args, model, mode) =>
-          mode === routeMode && model === veoModel,
+        matches: (args, model, mode) =>
+          mode === routeMode &&
+          model === veoModel &&
+          args.enableFallback !== true,
         credits: () => credits,
       }),
     ),

@@ -109,13 +109,19 @@ export const submitMediaGenerationTool: ToolDef<
           `Prepared plan contains unavailable tool(s): ${unavailableTools.join(", ")}.`,
         );
       }
-      const planCredits =
-        plan.total.status === "exact" ? plan.total.credits : undefined;
+      const exactCredits = (item: (typeof plan.items)[number]): number =>
+        item.price.status === "exact" ? (item.price.credits ?? 0) : 0;
       return await withSpendGuard(
         ctx,
-        planCredits,
+        {
+          credits: plan.items.reduce(
+            (sum, item) => sum + exactCredits(item),
+            0,
+          ),
+          unpriced: plan.items.some((item) => item.price.status !== "exact"),
+        },
         `plan:${planId}`,
-        async (commit) => {
+        async (spend) => {
           if (
             !(await ctx.db.claimGenerationPlan(
               planId,
@@ -127,7 +133,7 @@ export const submitMediaGenerationTool: ToolDef<
               "Approved plan is unavailable in this approval context, expired, changed, or already submitted.",
             );
           }
-          await commit();
+          spend.markExecuted();
           const results = await withConcurrency(
             plan.items,
             plan.maxConcurrency,
@@ -160,6 +166,13 @@ export const submitMediaGenerationTool: ToolDef<
             },
           );
           if (results.some((result) => result.error)) {
+            const failedCredits = results
+              .filter((result) => result.error)
+              .reduce(
+                (sum, result) => sum + exactCredits(plan.items[result.index]),
+                0,
+              );
+            await spend.refund(failedCredits);
             await ctx.db.failGenerationPlan(planId, results);
             throw new Error("One or more plan items failed.");
           }

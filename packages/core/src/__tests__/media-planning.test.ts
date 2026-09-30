@@ -507,6 +507,25 @@ describe("media planning", () => {
     expect(plan.total).toEqual({ status: "exact", credits: 328 });
   });
 
+  test("Veo with fallback enabled is not priced as exact", () => {
+    expect(
+      priceRequest(
+        "veo3_generate_video",
+        { enableFallback: true },
+        "veo3_fast",
+        "text-to-video",
+      ),
+    ).toMatchObject({ status: "unknown" });
+    expect(
+      priceRequest(
+        "veo3_generate_video",
+        { enableFallback: false },
+        "veo3_fast",
+        "text-to-video",
+      ),
+    ).toMatchObject({ status: "exact", credits: 60 });
+  });
+
   test("audits exact formulas by eligible provider route instead of treating partial tools as covered", () => {
     const audit = buildPricingAudit(new Date("2026-08-17T00:00:00.000Z")) as {
       coverage: {
@@ -874,6 +893,105 @@ describe("media planning", () => {
         expect(generate).not.toHaveBeenCalled();
         expect((await db.getGenerationPlan(planId))?.status).toBe("approved");
       } finally {
+        await cleanup();
+      }
+    });
+
+    test("a partially failed plan keeps spend only for the items that ran", async () => {
+      const { db, cleanup } = testDatabase();
+      try {
+        let calls = 0;
+        const client = {
+          generateNanoBananaImage: jest.fn(async () => {
+            calls += 1;
+            if (calls === 2) throw new Error("HTTP 500");
+            return {
+              code: 200,
+              msg: "success",
+              data: { taskId: `task-${calls}` },
+            };
+          }),
+          getCredits: async () => 1_000,
+        };
+        const prepared = await prepareMediaGenerationTool.run(
+          {
+            items: [
+              { tool: "nano_banana_image", args: { prompt: "one" } },
+              { tool: "nano_banana_image", args: { prompt: "two" } },
+            ],
+            maxConcurrency: 1,
+          },
+          context(db, client),
+        );
+        const planId = String(readResult(prepared).planId);
+        const stored = await db.getGenerationPlan(planId);
+        if (!stored) throw new Error("plan was not stored");
+        await db.approveGenerationPlan(planId, stored.requestHash, "test");
+        const submitted = await submitMediaGenerationTool.run(
+          { planId },
+          context(db, client),
+        );
+        expect(readResult(submitted)).toMatchObject({ success: false });
+        expect(await db.getSpendSince(new Date(0).toISOString())).toBe(4);
+      } finally {
+        await cleanup();
+      }
+    });
+
+    test("a plan mixing priced and unpriced items is refused under a cap unless unpriced is allowed", async () => {
+      const { db, cleanup } = testDatabase();
+      const previous = { ...process.env };
+      try {
+        let mixedCalls = 0;
+        const client = {
+          generateNanoBananaImage: jest.fn(async () => ({
+            code: 200,
+            msg: "success",
+            data: { taskId: `mixed-${++mixedCalls}` },
+          })),
+          getCredits: async () => 1_000,
+        };
+        const prepared = await prepareMediaGenerationTool.run(
+          {
+            items: [
+              { tool: "nano_banana_image", args: { prompt: "priced" } },
+              {
+                tool: "nano_banana_image",
+                args: {
+                  prompt: "unpriced",
+                  image_input: ["https://example.com/r.png"],
+                },
+              },
+            ],
+          },
+          context(db, client),
+        );
+        const planId = String(readResult(prepared).planId);
+        const stored = await db.getGenerationPlan(planId);
+        if (!stored) throw new Error("plan was not stored");
+        await db.approveGenerationPlan(planId, stored.requestHash, "test");
+        process.env.KIE_AI_DAILY_CREDIT_CAP = "100";
+        const refused = await submitMediaGenerationTool.run(
+          { planId },
+          context(db, client),
+        );
+        expect(readResult(refused)).toMatchObject({
+          success: false,
+          error: expect.stringContaining("no verified price"),
+        });
+        expect(client.generateNanoBananaImage).not.toHaveBeenCalled();
+
+        process.env.KIE_AI_ALLOW_UNPRICED = "true";
+        const allowed = await submitMediaGenerationTool.run(
+          { planId },
+          context(db, client),
+        );
+        expect(readResult(allowed)).toMatchObject({ success: true });
+        expect(await db.getSpendSince(new Date(0).toISOString())).toBe(4);
+      } finally {
+        delete process.env.KIE_AI_DAILY_CREDIT_CAP;
+        delete process.env.KIE_AI_ALLOW_UNPRICED;
+        Object.assign(process.env, { KIE_AI_API_KEY: previous.KIE_AI_API_KEY });
         await cleanup();
       }
     });

@@ -19,6 +19,9 @@ function budgetSummary(plan: PreparedGenerationPlan): string | undefined {
   const budget = plan.budget;
   if (!budget) return undefined;
   const parts: string[] = [];
+  if (budget.policyError) {
+    parts.push(`Spend caps could not be read (${budget.policyError})`);
+  }
   if (budget.balanceCredits !== undefined) {
     parts.push(`Balance: ${budget.balanceCredits} credits`);
     if (budget.remainingCredits !== undefined) {

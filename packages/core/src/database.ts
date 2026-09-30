@@ -22,6 +22,7 @@ export class TaskDatabase {
     }
 
     this.db = new sqlite3.Database(actualDbPath);
+    this.db.configure("busyTimeout", 5000);
     this.initializeDatabase();
   }
 
@@ -130,6 +131,39 @@ export class TaskDatabase {
         },
       );
     });
+  }
+
+  private exec(sql: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, (err) => (err ? reject(err) : resolve()));
+    });
+  }
+
+  /**
+   * Atomically checks the rolling cap and records the reservation. BEGIN
+   * IMMEDIATE takes SQLite's write lock, so two processes sharing this file
+   * cannot both pass the same cap.
+   */
+  async reserveSpend(
+    credits: number,
+    source: string,
+    dailyCap: number | undefined,
+    sinceIso: string,
+  ): Promise<{ ok: boolean; spent: number }> {
+    await this.exec("BEGIN IMMEDIATE");
+    try {
+      const spent = await this.getSpendSince(sinceIso);
+      if (dailyCap !== undefined && spent + credits > dailyCap) {
+        await this.exec("ROLLBACK");
+        return { ok: false, spent };
+      }
+      await this.recordSpend(credits, source);
+      await this.exec("COMMIT");
+      return { ok: true, spent };
+    } catch (error) {
+      await this.exec("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
   }
 
   async recordSpend(credits: number, source: string): Promise<void> {
