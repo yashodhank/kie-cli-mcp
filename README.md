@@ -350,6 +350,7 @@ export KIE_AI_SKIP_BALANCE_CHECK="true"    # Skip the balance lookup (caps still
 - The daily cap is counted from a local spend log (in the task database) and covers spend made through this tool only, not other clients using the same key. Keep the account balance low for a hard ceiling.
 - A blocked plan is not consumed. Top up or raise the cap and resubmit.
 - If the balance cannot be read, the request is refused (fail closed) unless `KIE_AI_SKIP_BALANCE_CHECK=true`.
+- `npm run pricing:drift` (opt-in, read-only) fetches Kie.ai's public price list and compares it with the built-in rate card. It exits 1 on drift or a missing live row, and 2 if the fetch fails. It never edits the rate card.
 
 ### Callback URL priority
 
