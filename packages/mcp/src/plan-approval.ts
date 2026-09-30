@@ -15,6 +15,32 @@ function priceSummary(plan: PreparedGenerationPlan): string {
     : "total price unknown because one or more request dimensions lack a verified formula";
 }
 
+function budgetSummary(plan: PreparedGenerationPlan): string | undefined {
+  const budget = plan.budget;
+  if (!budget) return undefined;
+  const parts: string[] = [];
+  if (budget.balanceCredits !== undefined) {
+    parts.push(`Balance: ${budget.balanceCredits} credits`);
+    if (budget.remainingCredits !== undefined) {
+      parts.push(`${budget.remainingCredits} left after this plan`);
+    }
+  } else if (budget.balanceError) {
+    parts.push(`Balance unavailable (${budget.balanceError})`);
+  }
+  if (budget.approxPlanUsd !== undefined) {
+    parts.push(`about $${budget.approxPlanUsd} for this plan`);
+  }
+  if (budget.dailyCreditCap !== undefined) {
+    parts.push(
+      `daily cap ${budget.spentLast24hCredits ?? 0}/${budget.dailyCreditCap} used`,
+    );
+  }
+  if (budget.maxCreditsPerPlan !== undefined) {
+    parts.push(`per-plan cap ${budget.maxCreditsPerPlan}`);
+  }
+  return parts.length > 0 ? `${parts.join("; ")}.` : undefined;
+}
+
 export function formatPlanApprovalMessage(
   plan: PreparedGenerationPlan,
 ): string {
@@ -34,6 +60,7 @@ export function formatPlanApprovalMessage(
     `Approve media generation plan ${plan.id}?`,
     `Expires: ${plan.expiresAt}. Max concurrent creates: ${plan.maxConcurrency}.`,
     `Price: ${priceSummary(plan)}.`,
+    ...(budgetSummary(plan) ? [budgetSummary(plan) as string] : []),
     items,
     "No provider task has been created. Confirming will record approval only; submission is a separate call.",
   ].join("\n");

@@ -8,6 +8,7 @@ import {
   getTool,
   KieAiClient,
   type KieAiConfig,
+  runToolGuarded,
   TOOL_REGISTRY,
   type ToolContext,
   ToolResult,
@@ -440,12 +441,16 @@ export class KieAiMcpServer {
           const task = this.taskEngine.start(
             name,
             async () =>
-              normalizeToolResult(await tool.run(args, requestContext)),
+              normalizeToolResult(
+                await runToolGuarded(tool, args ?? {}, requestContext),
+              ),
             taskParam,
           );
           return { task: taskToWire(task) } as unknown as CallToolResult;
         }
-        const toolResult = normalizeToolResult(await tool.run(args, ctx));
+        const toolResult = normalizeToolResult(
+          await runToolGuarded(tool, args ?? {}, ctx),
+        );
         if (toolResult.structuredContent?.input_required === true) {
           const plan = toolResult._meta?.["kie/approval-plan"] as
             | Parameters<typeof approvalInputRequired>[0]

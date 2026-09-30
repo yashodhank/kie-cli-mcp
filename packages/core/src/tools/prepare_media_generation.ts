@@ -1,4 +1,5 @@
 import { prepareGenerationPlan } from "../generation-plan.js";
+import { describeBudget } from "../spend-guard.js";
 import { PrepareMediaGenerationSchema } from "../types.js";
 import type {
   PlanApprovalDecision,
@@ -99,6 +100,7 @@ export const prepareMediaGenerationTool: ToolDef<
         maxConcurrency: request.maxConcurrency,
         expiresInSeconds: request.expiresInSeconds,
       });
+      plan.budget = await describeBudget(ctx, plan.total.credits);
       await ctx.db.createGenerationPlan(plan, ctx.approvalContext);
       if (!ctx.requestPlanApproval) {
         return pendingResult(

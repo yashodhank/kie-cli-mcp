@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- Added the `get_balance` tool and `KieAiClient.getCredits()` (`GET /chat/credit`).
+- Added a spend guard shared by `submit_media_generation` and direct image, video, and audio calls (MCP and CLI): balance check before spending, optional `KIE_AI_MAX_CREDITS_PER_PLAN` and `KIE_AI_DAILY_CREDIT_CAP` caps, `KIE_AI_ALLOW_UNPRICED`, and `KIE_AI_SKIP_BALANCE_CHECK`.
+- Added a local `spend_log` table backing the rolling 24h cap.
+- Prepared plans now carry a display-only budget snapshot (balance, credits left, approximate USD, caps) that is shown in the approval message.
+
 ## MCP 5.1.0 / CLI 0.9.0 / OpenAI transport 0.7.0 - 2026-08-25
 
 ### Added

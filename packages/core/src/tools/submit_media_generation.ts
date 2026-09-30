@@ -1,4 +1,5 @@
 import { hashPlanPayload } from "../generation-plan.js";
+import { withSpendGuard } from "../spend-guard.js";
 import { SubmitMediaGenerationSchema } from "../types.js";
 import type { ToolContext, ToolDef, ToolResult } from "./types.js";
 
@@ -108,88 +109,85 @@ export const submitMediaGenerationTool: ToolDef<
           `Prepared plan contains unavailable tool(s): ${unavailableTools.join(", ")}.`,
         );
       }
-      if (
-        plan.total.status === "exact" &&
-        (plan.total.credits ?? 0) > 0 &&
-        process.env.KIE_AI_SKIP_BALANCE_CHECK !== "true"
-      ) {
-        const needed = plan.total.credits as number;
-        const balance = await ctx.client.getCredits();
-        if (balance < needed) {
-          throw new Error(
-            `Insufficient Kie.ai credits: plan needs ${needed}, balance is ${balance}. Top up and resubmit; the plan was not consumed.`,
-          );
-        }
-      }
-      if (
-        !(await ctx.db.claimGenerationPlan(
-          planId,
-          stored.requestHash,
-          ctx.approvalContext,
-        ))
-      ) {
-        throw new Error(
-          "Approved plan is unavailable in this approval context, expired, changed, or already submitted.",
-        );
-      }
-      const results = await withConcurrency(
-        plan.items,
-        plan.maxConcurrency,
-        async (item) => {
-          const target = ctx.getTool(item.tool);
-          if (!target) {
+      const planCredits =
+        plan.total.status === "exact" ? plan.total.credits : undefined;
+      return await withSpendGuard(
+        ctx,
+        planCredits,
+        `plan:${planId}`,
+        async (commit) => {
+          if (
+            !(await ctx.db.claimGenerationPlan(
+              planId,
+              stored.requestHash,
+              ctx.approvalContext,
+            ))
+          ) {
             throw new Error(
-              `Prepared plan contains unavailable tool: ${item.tool}.`,
+              "Approved plan is unavailable in this approval context, expired, changed, or already submitted.",
             );
           }
-          try {
-            const envelope = await target.run(item.effectiveSettings, ctx);
-            const result = parseToolResult(envelope);
-            const error = resultError(envelope, result);
-            return {
-              index: item.index,
-              tool: item.tool,
-              taskId: extractTaskId(result),
-              result,
-              ...(error ? { error } : {}),
-            };
-          } catch (error) {
-            return {
-              index: item.index,
-              tool: item.tool,
-              result: null,
-              error: error instanceof Error ? error.message : String(error),
-            };
+          await commit();
+          const results = await withConcurrency(
+            plan.items,
+            plan.maxConcurrency,
+            async (item) => {
+              const target = ctx.getTool(item.tool);
+              if (!target) {
+                throw new Error(
+                  `Prepared plan contains unavailable tool: ${item.tool}.`,
+                );
+              }
+              try {
+                const envelope = await target.run(item.effectiveSettings, ctx);
+                const result = parseToolResult(envelope);
+                const error = resultError(envelope, result);
+                return {
+                  index: item.index,
+                  tool: item.tool,
+                  taskId: extractTaskId(result),
+                  result,
+                  ...(error ? { error } : {}),
+                };
+              } catch (error) {
+                return {
+                  index: item.index,
+                  tool: item.tool,
+                  result: null,
+                  error: error instanceof Error ? error.message : String(error),
+                };
+              }
+            },
+          );
+          if (results.some((result) => result.error)) {
+            await ctx.db.failGenerationPlan(planId, results);
+            throw new Error("One or more plan items failed.");
           }
+          await ctx.db.finishGenerationPlan(planId, results);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    planId,
+                    requestHash: stored.requestHash,
+                    results,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            structuredContent: {
+              plan_id: planId,
+              request_hash: stored.requestHash,
+              results,
+            },
+          };
         },
       );
-      if (results.some((result) => result.error)) {
-        await ctx.db.failGenerationPlan(planId, results);
-        throw new Error("One or more plan items failed.");
-      }
-      await ctx.db.finishGenerationPlan(planId, results);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              {
-                success: true,
-                planId,
-                requestHash: stored.requestHash,
-                results,
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-        structuredContent: {
-          plan_id: planId,
-          request_hash: stored.requestHash,
-          results,
-        },
-      };
     } catch (error) {
       return ctx.formatError("submit_media_generation", error, {
         planId:

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {
   createToolContext,
+  runToolGuarded,
   TOOL_REGISTRY,
   type ToolContext,
   type ToolDef,
@@ -68,7 +69,7 @@ async function runTool(
     args[key] = value;
   }
 
-  const result = await tool.run(args, ctx);
+  const result = await runToolGuarded(tool, args, ctx);
   const text = result.content?.[0]?.text ?? "";
 
   if (argv.json) {

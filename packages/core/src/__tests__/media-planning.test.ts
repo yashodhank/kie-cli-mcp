@@ -862,12 +862,13 @@ describe("media planning", () => {
           getCredits,
         };
         const { planId } = await approvedPlan(db, client);
+        const callsAfterPrepare = getCredits.mock.calls.length;
         const submitted = await submitMediaGenerationTool.run(
           { planId },
           context(db, client),
         );
         expect(readResult(submitted)).toMatchObject({ success: true });
-        expect(getCredits).not.toHaveBeenCalled();
+        expect(getCredits.mock.calls.length).toBe(callsAfterPrepare);
       } finally {
         if (previous === undefined)
           delete process.env.KIE_AI_SKIP_BALANCE_CHECK;

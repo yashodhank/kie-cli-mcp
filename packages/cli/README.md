@@ -21,7 +21,7 @@ npm install -g @felores/kie-cli
 export KIE_AI_API_KEY="your-key"
 ```
 
-Optional: `KIE_AI_BASE_URL`, `KIE_AI_TIMEOUT`, `KIE_AI_DB_PATH`, `KIE_AI_CALLBACK_URL`.
+Optional: `KIE_AI_BASE_URL`, `KIE_AI_TIMEOUT`, `KIE_AI_DB_PATH`, `KIE_AI_CALLBACK_URL`, and the spend controls `KIE_AI_MAX_CREDITS_PER_PLAN`, `KIE_AI_DAILY_CREDIT_CAP`, `KIE_AI_ALLOW_UNPRICED`, `KIE_AI_SKIP_BALANCE_CHECK` (see the root README).
 `upload_file` accepts validated Base64 or a local path beneath explicitly
 configured `KIE_CLI_UPLOAD_ROOTS`. Temporary HTTP upload
 capabilities and `upload_widget` require the MCP HTTP adapter and return clear

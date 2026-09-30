@@ -29,7 +29,8 @@ Add to your MCP client config (e.g. Claude Desktop `claude_desktop_config.json`)
 ### Environment
 
 - Required: `KIE_AI_API_KEY`
-- Optional: `KIE_AI_BASE_URL`, `KIE_AI_TIMEOUT`, `KIE_AI_DB_PATH`,
+- Optional: `KIE_AI_BASE_URL`, `KIE_AI_TIMEOUT`, `KIE_AI_DB_PATH`, `KIE_AI_MAX_CREDITS_PER_PLAN`,
+  `KIE_AI_DAILY_CREDIT_CAP`, `KIE_AI_ALLOW_UNPRICED`, `KIE_AI_SKIP_BALANCE_CHECK`,
   `KIE_AI_CALLBACK_URL`
 - Optional remote upload storage: `KIE_MCP_PUBLIC_BASE_URL`,
   `KIE_MCP_HTTP_TOKEN`, `MCP_ALLOWED_HOSTS`, `MCP_ALLOWED_ORIGINS`, and

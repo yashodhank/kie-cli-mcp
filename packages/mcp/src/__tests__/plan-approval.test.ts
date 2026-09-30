@@ -3,6 +3,7 @@ import { describe, expect, jest, test } from "@jest/globals";
 import type { Server, ServerContext } from "@modelcontextprotocol/server";
 import {
   approvalInputRequired,
+  formatPlanApprovalMessage,
   requestMcpPlanApproval,
 } from "../plan-approval.js";
 
@@ -180,5 +181,41 @@ describe("MCP media-plan approval", () => {
         params: { mode: "form" },
       },
     });
+  });
+});
+
+describe("approval message budget line", () => {
+  test("shows balance, remaining credits, approximate USD and caps", () => {
+    const message = formatPlanApprovalMessage({
+      ...plan,
+      budget: {
+        balanceCredits: 500,
+        planCredits: 4,
+        remainingCredits: 496,
+        approxPlanUsd: 0.02,
+        dailyCreditCap: 1000,
+        spentLast24hCredits: 120,
+        maxCreditsPerPlan: 200,
+      },
+    });
+    expect(message).toContain(
+      "Balance: 500 credits; 496 left after this plan; about $0.02 for this plan; daily cap 120/1000 used; per-plan cap 200.",
+    );
+  });
+
+  test("says so when the balance could not be read", () => {
+    const message = formatPlanApprovalMessage({
+      ...plan,
+      budget: {
+        balanceError: "HTTP 401: invalid key",
+        planCredits: 4,
+        approxPlanUsd: 0.02,
+      },
+    });
+    expect(message).toContain("Balance unavailable (HTTP 401: invalid key)");
+  });
+
+  test("adds nothing when the plan has no budget snapshot", () => {
+    expect(formatPlanApprovalMessage(plan)).not.toContain("Balance");
   });
 });

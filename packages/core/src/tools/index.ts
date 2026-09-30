@@ -39,6 +39,7 @@ import { wanAnimateTool } from "./wan_animate.js";
 import { wanVideoTool } from "./wan_video.js";
 import { zImageTool } from "./z_image.js";
 
+export * from "./run-guarded.js";
 export * from "./types.js";
 
 /**

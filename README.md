@@ -338,6 +338,19 @@ export KIE_AI_CALLBACK_URL="https://your-domain.com/webhook" # Custom callback
 export KIE_AI_CALLBACK_URL_FALLBACK="https://your-proxy.com/callback"  # Deployment-wide default
 ```
 
+### Spend controls
+Paid generations (prepared plans, and direct image/video/audio calls from the CLI or MCP) check your Kie.ai credit balance first and are refused when the balance cannot cover the price. `get_balance` returns the current balance. All caps are off unless set.
+```bash
+export KIE_AI_MAX_CREDITS_PER_PLAN="200"   # Refuse any single plan/call priced above this many credits
+export KIE_AI_DAILY_CREDIT_CAP="1000"      # Rolling 24h cap on credits committed through this tool
+export KIE_AI_ALLOW_UNPRICED="true"        # Allow requests with no verified price while a cap is set
+export KIE_AI_SKIP_BALANCE_CHECK="true"    # Skip the balance lookup (caps still apply)
+```
+- Prices come from the built-in rate card; a request without a verified price is "unpriced". With no caps set, unpriced requests run as before. With a cap set they are refused unless `KIE_AI_ALLOW_UNPRICED=true`, because a cap cannot be enforced on an unknown price.
+- The daily cap is counted from a local spend log (in the task database) and covers spend made through this tool only, not other clients using the same key. Keep the account balance low for a hard ceiling.
+- A blocked plan is not consumed. Top up or raise the cap and resubmit.
+- If the balance cannot be read, the request is refused (fail closed) unless `KIE_AI_SKIP_BALANCE_CHECK=true`.
+
 ### Callback URL priority
 
 | Priority | Source | Variable |

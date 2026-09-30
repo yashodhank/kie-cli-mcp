@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "crypto";
 import type { z } from "zod";
 import { getCatalogEntry } from "./model-catalog.js";
 import { type PriceState, priceRequest } from "./pricing/rate-card.js";
+import type { PlanBudget } from "./spend-guard.js";
 import type { ToolDef } from "./tools/types.js";
 
 export interface PreparedPlanItem {
@@ -25,6 +26,8 @@ export interface PreparedGenerationPlan {
   items: PreparedPlanItem[];
   total: { credits?: number; status: "exact" | "unknown" };
   requestHash: string;
+  /** Display-only snapshot added at prepare time; excluded from requestHash. */
+  budget?: PlanBudget;
 }
 
 const POLICY_DEFAULTS: Record<string, Record<string, unknown>> = {
@@ -193,6 +196,20 @@ function resolveOutputCount(args: Record<string, unknown>): number {
     if (Number.isInteger(count) && count > 0) return count;
   }
   return 1;
+}
+
+/** Prices one direct tool call with the same resolvers a prepared plan uses. */
+export function priceToolCall(
+  tool: ToolDef,
+  args: Record<string, unknown>,
+): PriceState {
+  const parsed = tool.schema.parse(args) as Record<string, unknown>;
+  return priceRequest(
+    tool.name,
+    { ...parsed, outputCount: resolveOutputCount(parsed) },
+    resolveModel(tool.name, parsed),
+    resolveGenerationMode(tool.name, parsed),
+  );
 }
 
 function toolSchemaDefaults(

@@ -76,6 +76,18 @@ export class TaskDatabase {
         )
       `);
 
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS spend_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          created_at TEXT NOT NULL,
+          credits REAL NOT NULL,
+          source TEXT NOT NULL
+        )
+      `);
+      this.db.run(
+        `CREATE INDEX IF NOT EXISTS idx_spend_log_created_at ON spend_log(created_at)`,
+      );
+
       this.db.run(`CREATE INDEX IF NOT EXISTS idx_task_id ON tasks(task_id)`);
       this.db.run(`CREATE INDEX IF NOT EXISTS idx_status ON tasks(status)`);
       this.db.run(
@@ -115,6 +127,32 @@ export class TaskDatabase {
         (err) => {
           if (err) reject(err);
           else resolve();
+        },
+      );
+    });
+  }
+
+  async recordSpend(credits: number, source: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO spend_log (created_at, credits, source) VALUES (?, ?, ?)`,
+        [new Date().toISOString(), credits, source],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        },
+      );
+    });
+  }
+
+  async getSpendSince(sinceIso: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        `SELECT COALESCE(SUM(credits), 0) AS total FROM spend_log WHERE created_at >= ?`,
+        [sinceIso],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(Number((row as { total: number }).total));
         },
       );
     });

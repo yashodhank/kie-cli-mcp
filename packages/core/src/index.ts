@@ -13,6 +13,7 @@ export * from "./media-validation.js";
 export * from "./model-catalog.js";
 export * from "./pricing/audit.js";
 export * from "./pricing/rate-card.js";
+export * from "./spend-guard.js";
 export * from "./tools/format-error.js";
 export * from "./tools/index.js";
 export * from "./types.js";
