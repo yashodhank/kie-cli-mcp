@@ -9,12 +9,14 @@ import { buildPricingAudit } from "../pricing/audit.js";
 import { priceRequest, RATE_CARD } from "../pricing/rate-card.js";
 import { getBalanceTool } from "../tools/get_balance.js";
 import { getTaskStatusTool } from "../tools/get_task_status.js";
+import { gptImage2Tool } from "../tools/gpt_image_2.js";
 import { hailuoVideoTool } from "../tools/hailuo_video.js";
 import { getTool } from "../tools/index.js";
 import { nanoBananaImageTool } from "../tools/nano_banana_image.js";
 import { prepareMediaGenerationTool } from "../tools/prepare_media_generation.js";
 import { submitMediaGenerationTool } from "../tools/submit_media_generation.js";
 import type { ToolContext, ToolDef } from "../tools/types.js";
+import { veo3GenerateVideoTool } from "../tools/veo3_generate_video.js";
 
 function readResult(result: {
   content: Array<{ text: string }>;
@@ -94,7 +96,9 @@ describe("media planning", () => {
     });
     expect(item.appliedDefaults).not.toHaveProperty("model");
     expect(item.appliedDefaults).not.toHaveProperty("resolution");
-    expect(item.price).toEqual(expect.objectContaining({ status: "unknown" }));
+    expect(item.price).toEqual(
+      expect.objectContaining({ status: "exact", credits: 12 }),
+    );
   });
 
   test("validates target schemas during prepare and does not call a provider", async () => {
@@ -436,14 +440,14 @@ describe("media planning", () => {
         "nano-banana-2-lite",
         "image-to-image",
       ),
-    ).toEqual({ status: "unknown", rateCardVersion: "2026-08-17" });
+    ).toEqual({ status: "unknown", rateCardVersion: "2026-09-30" });
     const hailuo = priceRequest(
       "hailuo_video",
       { duration: 6, resolution: "768p" },
       "minimax-h3",
       "reference-to-video",
     );
-    expect(hailuo).toMatchObject({ status: "exact", credits: 96 });
+    expect(hailuo).toMatchObject({ status: "exact", credits: 48 });
     expect(
       priceRequest(
         "hailuo_video",
@@ -451,21 +455,25 @@ describe("media planning", () => {
         "minimax-h3",
         "reference-to-video",
       ),
-    ).toEqual({ status: "unknown", rateCardVersion: "2026-08-17" });
+    ).toEqual({ status: "unknown", rateCardVersion: "2026-09-30" });
     expect(
       RATE_CARD.every(
         (entry) =>
           entry.verifiedAt && entry.sourceFingerprint && entry.sourceUrl,
       ),
     ).toBe(true);
-    expect(RATE_CARD).toHaveLength(2);
+    expect(RATE_CARD).toHaveLength(15);
 
     const plan = prepareGenerationPlan(
       [
         { tool: "nano_banana_image", args: { prompt: "A fox" } },
         {
           tool: "nano_banana_image",
-          args: { prompt: "A bear", model: "nano-banana-2" },
+          args: {
+            prompt: "A bear",
+            model: "nano-banana-2",
+            image_input: ["https://example.com/ref.png"],
+          },
         },
       ],
       new Map([["nano_banana_image", nanoBananaImageTool]]),
@@ -474,6 +482,29 @@ describe("media planning", () => {
     expect(plan.items[1].price.status).toBe("unknown");
     expect(plan.total).toEqual({ status: "unknown" });
     expect(JSON.stringify(plan)).not.toContain("USD");
+  });
+
+  test("prices Nano Banana 2, GPT Image 2 and Veo 3.1 routes exactly and sums the plan", () => {
+    const plan = prepareGenerationPlan(
+      [
+        {
+          tool: "nano_banana_image",
+          args: { prompt: "A", model: "nano-banana-2" },
+        },
+        { tool: "gpt_image_2", args: { prompt: "B", resolution: "2K" } },
+        { tool: "veo3_generate_video", args: { prompt: "C" } },
+        { tool: "veo3_generate_video", args: { prompt: "D", model: "veo3" } },
+      ],
+      new Map<string, ToolDef>([
+        ["nano_banana_image", nanoBananaImageTool as unknown as ToolDef],
+        ["gpt_image_2", gptImage2Tool as unknown as ToolDef],
+        ["veo3_generate_video", veo3GenerateVideoTool as unknown as ToolDef],
+      ]),
+    );
+    expect(plan.items.map((item) => item.price.credits)).toEqual([
+      8, 10, 60, 250,
+    ]);
+    expect(plan.total).toEqual({ status: "exact", credits: 328 });
   });
 
   test("audits exact formulas by eligible provider route instead of treating partial tools as covered", () => {

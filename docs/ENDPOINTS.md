@@ -154,7 +154,7 @@ To add a model: `npm run add-tool -- <name> <category>`, then fill the schema + 
 
 ## Pricing reference
 
-`packages/core/src/pricing/rate-card.ts` contains only verified credit formulas. Nano Banana 2 Lite is four credits per image, and MiniMax H3 reference-to-video at 768p is 16 credits per second. All other requests are `unknown`; the project has no fixed USD conversion. Run `npm run pricing:audit` for read-only coverage and staleness reporting.
+`packages/core/src/pricing/rate-card.ts` contains only verified credit formulas. Verified formulas cover: Nano Banana 2 Lite text-to-image (4 credits), Nano Banana 2 text-to-image at 1K/2K/4K (8/12/18), GPT Image 2 text-to-image and image-to-image at 1K/2K/4K (6/10/16), Veo 3.1 Fast and Quality text-to-video and image-to-video at 720p (60 and 250 per video), and MiniMax H3 reference-to-video at 768p (8 credits per second). All other requests are `unknown`; `npm run pricing:drift` compares these against the live Kie.ai price list; the project has no fixed USD conversion. Run `npm run pricing:audit` for read-only coverage and staleness reporting.
 
 Run `npm run pricing:refresh` for a read-only report of the source freshness recorded in `packages/core/src/pricing/evidence-manifest.json`; it does not fetch, scrape, or write. `npm run pricing:refresh -- --apply` is the only mutation boundary. With no proposal file, it reports an explicit no-op. With `--proposals <file>`, it validates every exact-credit proposal has an HTTPS source URL, fingerprint, ISO verification date, route scope, and existing test-file references before recording proposals in that manifest only. It never changes rate-card TypeScript or creates a USD conversion automatically.
 

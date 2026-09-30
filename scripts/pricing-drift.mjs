@@ -31,6 +31,41 @@ export const CHECKS = [
     units: 1,
     liveDescription: "MiniMax H3, reference to video, 768p",
   },
+  ...["1K", "2K", "4K"].map((resolution) => ({
+    label: `nano_banana_image text-to-image nano-banana-2 ${resolution}`,
+    sample: {
+      tool: "nano_banana_image",
+      args: { outputCount: 1, resolution },
+      model: "nano-banana-2",
+      mode: "text-to-image",
+    },
+    units: 1,
+    liveDescription: `Google nano banana 2, ${resolution}`,
+  })),
+  ...["text-to-image", "image-to-image"].flatMap((mode) =>
+    ["1K", "2K", "4K"].map((resolution) => ({
+      label: `gpt_image_2 ${mode} ${resolution}`,
+      sample: {
+        tool: "gpt_image_2",
+        args: { outputCount: 1, resolution },
+        model: "gpt-image-2",
+        mode,
+      },
+      units: 1,
+      liveDescription: `gpt image 2, ${mode}, ${resolution}`,
+    })),
+  ),
+  ...[
+    ["veo3_fast", "Fast"],
+    ["veo3", "Quality"],
+  ].flatMap(([model, label]) =>
+    ["text-to-video", "image-to-video"].map((mode) => ({
+      label: `veo3_generate_video ${mode} ${model} 720p`,
+      sample: { tool: "veo3_generate_video", args: {}, model, mode },
+      units: 1,
+      liveDescription: `Google veo 3.1, ${mode}, ${label}-720p`,
+    })),
+  ),
 ];
 
 export async function fetchLivePricing(fetchImpl = fetch, pageSize = 100) {

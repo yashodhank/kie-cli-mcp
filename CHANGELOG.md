@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+- Corrected the MiniMax H3 reference-to-video 768p rate from 16 to 8 credits per second to match the live Kie.ai price list (rate card version 2026-09-30).
+
 ### Added
 - Added the `get_balance` tool and `KieAiClient.getCredits()` (`GET /chat/credit`).
 - Added a spend guard shared by `submit_media_generation` and direct image, video, and audio calls (MCP and CLI): balance check before spending, optional `KIE_AI_MAX_CREDITS_PER_PLAN` and `KIE_AI_DAILY_CREDIT_CAP` caps, `KIE_AI_ALLOW_UNPRICED`, and `KIE_AI_SKIP_BALANCE_CHECK`.
 - Added a local `spend_log` table backing the rolling 24h cap.
+- Added verified rate-card formulas for Nano Banana 2 (1K/2K/4K), GPT Image 2 (1K/2K/4K, text and image-to-image), and Veo 3.1 Fast/Quality at 720p, so far more plans get an exact price and can be checked against the balance and caps.
 - Added the opt-in `npm run pricing:drift` script that compares the rate card with Kie.ai's live price list.
 - Prepared plans now carry a display-only budget snapshot (balance, credits left, approximate USD, caps) that is shown in the approval message.
 
