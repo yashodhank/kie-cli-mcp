@@ -109,6 +109,19 @@ export const submitMediaGenerationTool: ToolDef<
         );
       }
       if (
+        plan.total.status === "exact" &&
+        (plan.total.credits ?? 0) > 0 &&
+        process.env.KIE_AI_SKIP_BALANCE_CHECK !== "true"
+      ) {
+        const needed = plan.total.credits as number;
+        const balance = await ctx.client.getCredits();
+        if (balance < needed) {
+          throw new Error(
+            `Insufficient Kie.ai credits: plan needs ${needed}, balance is ${balance}. Top up and resubmit; the plan was not consumed.`,
+          );
+        }
+      }
+      if (
         !(await ctx.db.claimGenerationPlan(
           planId,
           stored.requestHash,

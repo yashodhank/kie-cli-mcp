@@ -14,6 +14,7 @@ const EXPECTED_TOOL_NAMES = [
   "flux2_image",
   "finalize_upload",
   "flux_kontext_image",
+  "get_balance",
   "get_task_status",
   "get_upload_url",
   "gpt_image_2",

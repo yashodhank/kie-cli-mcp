@@ -442,6 +442,16 @@ export class KieAiClient {
     return this.makeRequest<TaskResponse>("/veo/generate", "POST", request);
   }
 
+  async getCredits(): Promise<number> {
+    const response = await this.makeRequest<number>("/chat/credit", "GET");
+    if (typeof response.data !== "number" || !Number.isFinite(response.data)) {
+      throw new Error(
+        `Credit balance response was not a number: ${providerMessage(response, "no message")}`,
+      );
+    }
+    return response.data;
+  }
+
   async getTaskStatus(
     taskId: string,
     apiType?: string,

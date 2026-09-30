@@ -2307,6 +2307,9 @@ export const ListModelsSchema = z.object({
 });
 export type ListModelsRequest = z.infer<typeof ListModelsSchema>;
 
+export const GetBalanceSchema = z.object({});
+export type GetBalanceRequest = z.infer<typeof GetBalanceSchema>;
+
 export const PrepareMediaGenerationSchema = z.object({
   items: z
     .array(

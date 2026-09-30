@@ -516,3 +516,38 @@ describe("KieAiClient Midjourney video routing", () => {
     });
   });
 });
+
+describe("KieAiClient credit balance", () => {
+  test("reads the remaining credits with a GET to /chat/credit", async () => {
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ code: 200, msg: "success", data: 1234 }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(new KieAiClient(config).getCredits()).resolves.toBe(1234);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://provider.example/api/v1/chat/credit",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  test("rejects a response whose data is not a number", async () => {
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: 401,
+          msg: "You do not have access",
+          data: null,
+        }),
+        {
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+
+    await expect(new KieAiClient(config).getCredits()).rejects.toThrow(
+      /not a number.*You do not have access/,
+    );
+  });
+});

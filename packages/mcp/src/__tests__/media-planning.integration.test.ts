@@ -84,11 +84,16 @@ describe("MCP media planning integration", () => {
       msg: "ok",
       data: { taskId: "local-provider-task" },
     }));
-    (
+    const patchedClient = (
       app as unknown as {
-        client: { generateNanoBananaImage: typeof providerCall };
+        client: {
+          generateNanoBananaImage: typeof providerCall;
+          getCredits: () => Promise<number>;
+        };
       }
-    ).client.generateNanoBananaImage = providerCall;
+    ).client;
+    patchedClient.generateNanoBananaImage = providerCall;
+    patchedClient.getCredits = async () => 1_000_000;
 
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();

@@ -7,6 +7,7 @@ import { prepareGenerationPlan } from "../generation-plan.js";
 import { filterCatalog } from "../model-catalog.js";
 import { buildPricingAudit } from "../pricing/audit.js";
 import { priceRequest, RATE_CARD } from "../pricing/rate-card.js";
+import { getBalanceTool } from "../tools/get_balance.js";
 import { getTaskStatusTool } from "../tools/get_task_status.js";
 import { hailuoVideoTool } from "../tools/hailuo_video.js";
 import { getTool } from "../tools/index.js";
@@ -42,7 +43,10 @@ function context(
 ): ToolContext {
   return {
     db,
-    client: client as unknown as ToolContext["client"],
+    client: {
+      getCredits: async () => 1_000_000,
+      ...client,
+    } as unknown as ToolContext["client"],
     approvalContext,
     getCallbackUrl: (url) => url ?? "https://callback.example/complete",
     getTool: availableTool,
@@ -758,6 +762,142 @@ describe("media planning", () => {
         "prepared",
       );
       expect(client.generateNanoBananaImage).not.toHaveBeenCalled();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  describe("balance gate", () => {
+    async function approvedPlan(
+      db: TaskDatabase,
+      client: Record<string, unknown>,
+    ) {
+      const prepared = await prepareMediaGenerationTool.run(
+        { items: [{ tool: "nano_banana_image", args: { prompt: "Gate" } }] },
+        context(db, client),
+      );
+      const planId = String(readResult(prepared).planId);
+      const stored = await db.getGenerationPlan(planId);
+      if (!stored) throw new Error("plan was not stored");
+      await db.approveGenerationPlan(planId, stored.requestHash, "test");
+      return { planId, credits: stored.plan.total.credits ?? 0 };
+    }
+
+    test("refuses an under-funded submit without consuming or running the plan", async () => {
+      const { db, cleanup } = testDatabase();
+      try {
+        const generate = jest.fn(async () => ({
+          code: 200,
+          msg: "success",
+          data: { taskId: "task-1" },
+        }));
+        const client = {
+          generateNanoBananaImage: generate,
+          getCredits: jest.fn(async () => 0),
+        };
+        const { planId, credits } = await approvedPlan(db, client);
+        expect(credits).toBeGreaterThan(0);
+
+        const refused = await submitMediaGenerationTool.run(
+          { planId },
+          context(db, client),
+        );
+        expect(readResult(refused)).toMatchObject({
+          success: false,
+          error: expect.stringContaining("Insufficient Kie.ai credits"),
+        });
+        expect(generate).not.toHaveBeenCalled();
+        expect((await db.getGenerationPlan(planId))?.status).toBe("approved");
+
+        client.getCredits.mockResolvedValue(credits);
+        const submitted = await submitMediaGenerationTool.run(
+          { planId },
+          context(db, client),
+        );
+        expect(readResult(submitted)).toMatchObject({ success: true });
+        expect(generate).toHaveBeenCalledTimes(1);
+      } finally {
+        await cleanup();
+      }
+    });
+
+    test("fails closed when the balance cannot be read", async () => {
+      const { db, cleanup } = testDatabase();
+      try {
+        const generate = jest.fn();
+        const client = {
+          generateNanoBananaImage: generate,
+          getCredits: jest.fn(async () => {
+            throw new Error("HTTP 401: invalid key");
+          }),
+        };
+        const { planId } = await approvedPlan(db, client);
+        const refused = await submitMediaGenerationTool.run(
+          { planId },
+          context(db, client),
+        );
+        expect(readResult(refused)).toMatchObject({
+          success: false,
+          error: expect.stringContaining("invalid key"),
+        });
+        expect(generate).not.toHaveBeenCalled();
+        expect((await db.getGenerationPlan(planId))?.status).toBe("approved");
+      } finally {
+        await cleanup();
+      }
+    });
+
+    test("KIE_AI_SKIP_BALANCE_CHECK bypasses the gate", async () => {
+      const { db, cleanup } = testDatabase();
+      const previous = process.env.KIE_AI_SKIP_BALANCE_CHECK;
+      process.env.KIE_AI_SKIP_BALANCE_CHECK = "true";
+      try {
+        const getCredits = jest.fn(async () => 0);
+        const client = {
+          generateNanoBananaImage: jest.fn(async () => ({
+            code: 200,
+            msg: "success",
+            data: { taskId: "task-1" },
+          })),
+          getCredits,
+        };
+        const { planId } = await approvedPlan(db, client);
+        const submitted = await submitMediaGenerationTool.run(
+          { planId },
+          context(db, client),
+        );
+        expect(readResult(submitted)).toMatchObject({ success: true });
+        expect(getCredits).not.toHaveBeenCalled();
+      } finally {
+        if (previous === undefined)
+          delete process.env.KIE_AI_SKIP_BALANCE_CHECK;
+        else process.env.KIE_AI_SKIP_BALANCE_CHECK = previous;
+        await cleanup();
+      }
+    });
+  });
+
+  test("get_balance reports remaining credits and surfaces read failures", async () => {
+    const { db, cleanup } = testDatabase();
+    try {
+      const ok = await getBalanceTool.run(
+        {},
+        context(db, { getCredits: async () => 4200 }),
+      );
+      expect(readResult(ok)).toMatchObject({ success: true, credits: 4200 });
+
+      const failed = await getBalanceTool.run(
+        {},
+        context(db, {
+          getCredits: async () => {
+            throw new Error("HTTP 401: invalid key");
+          },
+        }),
+      );
+      expect(readResult(failed)).toMatchObject({
+        success: false,
+        error: expect.stringContaining("invalid key"),
+      });
     } finally {
       await cleanup();
     }
