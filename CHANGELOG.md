@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added the `get_balance` tool and `KieAiClient.getCredits()` (`GET /chat/credit`).
 - Added a spend guard shared by `submit_media_generation` and direct image, video, and audio calls (MCP and CLI): balance check before spending, optional `KIE_AI_MAX_CREDITS_PER_PLAN` and `KIE_AI_DAILY_CREDIT_CAP` caps, `KIE_AI_ALLOW_UNPRICED`, and `KIE_AI_SKIP_BALANCE_CHECK`.
-- Added a local `spend_log` table backing the rolling 24h cap.
+- Added a local `spend_log` table backing the rolling 24h cap. Spend is reserved atomically (SQLite `BEGIN IMMEDIATE`) before provider calls and refunded for calls or plan items that fail.
 - Added the opt-in `npm run pricing:drift` script that compares the rate card with Kie.ai's live price list.
 - Prepared plans now carry a display-only budget snapshot (balance, credits left, approximate USD, caps) that is shown in the approval message.
 
